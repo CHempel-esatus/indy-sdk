@@ -28,6 +28,7 @@ use indy_utils::crypto::ed25519_sign;
 use super::ursa::bls::VerKey;
 use super::zmq;
 use indy_api_types::{PoolHandle, CommandHandle};
+use std::env;
 
 struct PoolSM<T: Networker, R: RequestHandler<T>> {
     pool_name: String,
@@ -532,6 +533,12 @@ struct PoolThread<S: Networker, R: RequestHandler<S>> {
 impl<S: Networker, R: RequestHandler<S>> PoolThread<S, R> {
     pub fn new(cmd_socket: zmq::Socket, name: String, id: PoolHandle, timeout: i64, extended_timeout: i64, active_timeout: i64, conn_limit: usize, preordered_nodes: Vec<String>, number_read_nodes: u8) -> Self {
         let networker = Rc::new(RefCell::new(S::new(active_timeout, conn_limit, preordered_nodes)));
+        let socks_proxy_address = env::var("SOCKS_PROXY_ADDRESS").unwrap_or("none".to_string());
+        let socks_proxy_port = env::var("SOCKS_PROXY_PORT").unwrap_or("none".to_string());
+        if socks_proxy_address != "none" && socks_proxy_port != "none"{
+            let socks_proxy = format!("{}:{}", socks_proxy_address, socks_proxy_port);
+            cmd_socket.set_socks_proxy(Some(&socks_proxy)).unwrap();
+        }
         PoolThread {
             pool_sm: Some(PoolSM::new(networker.clone(), &name, id, timeout, extended_timeout, number_read_nodes)),
             events: VecDeque::new(),
